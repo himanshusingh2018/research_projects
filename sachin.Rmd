@@ -1,0 +1,90 @@
+---
+title: "sachin"
+author: "HN Singh"
+date: "2022-09-03"
+output: html_document
+---
+## Dataset Information
+
+GSE30219 293 lung tumor samples (21 SCLC, 85 LUAD, 61 LUSC, 39 lung cancer basaloid, 56 LCNEC, 24 Carcinoids, 3 LCC, and 4 others) and 14 non-tumoral lung samples; GPL570 [HG-U133_Plus_2] Affymetrix Human Genome U133 Plus 2.0 Array
+
+GSE40275 8 SCLC, 11 NSCLC, 14 normal lung Affymetrix Human Exon 1.0 ST Array
+
+GSE6044 29 lung cancer (10 LUAD, 10 LUSC, 9 SCLC) and 5 normal lung tissue of 5 control patients without tumor Affymetrix Human HG-Focus Target Array
+
+GSE149507 18 pairs of SCLC tumor and adjacent lung tissues; Expression profiling by microarray (Affymetrix Human Genome U133 Plus 2.0 Array
+
+GSE108055 64 human lung samples including 31 typical carcinoid, 11 atypical carcinoid, 12 SCLC, and 9 adjacent normal lung tissues; Illumina Human WG-6_v2.0 BeadArray Chip
+
+SCLC: small cell lung cancer; NSCLC: non-small cell lung cancer; LUAD: lung adenocarcinoma; LUSC: lung squamous cell carcinoma; LCNEC: large cell neuroendocrine carcinoma; LCC: large cell carcinoma ≤ ≥
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+## Install Libraries
+```{r library}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("GEOquery")
+```
+
+## Samples
+GSE30219    HG-U133_Plus_2
+GSE40275    Affymatrix Human Exon 1.0 ST Array
+GSE6044     Affymatrix Human HG-Focus Target Array
+GSE149507   Affymatrix Human Genome U133 Plus 2.0 Array
+GSE108055   Illumina Human WG-6_v2.0 BeadArray Chip
+
+Data: GSE108055 Expression Extraction
+BeadArray Data Analysis Steps:
+1. Download GSE108055_non-normalized.txt.gz  (https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE108055)
+
+2. Download Sample Information from Series Matrix File
+ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE108nnn/GSE108055/matrix/GSE108055_series_matrix.txt.gz
+  Sample Information collected:
+  1. ^ !Series_sample_id, GSM ID
+  2. ^!Sample_title, sampe name e.g. "Lu-278-TC"
+  3. ^!Sample_source_name_ch1, tissue type e.g. carcinoid or SCLC
+  4. ^ !Sample_description, sample id e.g. "1705168094_A"
+
+```{r beadchip expression data extraction}
+#gse108055 <- read.csv(file='../Data/GSE108055_non-normalized.txt.gz', sep="\t", header = TRUE)
+#ftp file is not working
+#gse108055 <- read.csv(file='https://ftp.ncbi.nlm.nih.gov/geo/series/GSE108nnn/GSE108055/suppl/GSE108055_non-normalized.txt.gz', sep="\t", header = TRUE)
+sampInfo <- readLines('../Data/GSE108055_series_matrix.txt.gz')[grep('!Series_sample_id|!Sample_title|!Sample_source_name_ch1|!Sample_description', readLines('../Data/GSE108055_series_matrix.txt.gz'))]
+
+writeLines(as.character(sampInfo), "sampInfo.txt")
+
+print(sampInfo)
+```
+
+## other data analysis
+```{r data analysis}
+library(GEOquery)
+my_id <- 'GSE108055'
+gse <- getGEO(my_id)
+gse <- gse[[1]]
+
+exprs(gse) <- log2(exprs(gse))
+annot <- fData(gse)
+exp <- exprs(gse)
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

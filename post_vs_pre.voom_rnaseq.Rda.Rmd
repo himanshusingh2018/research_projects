@@ -1,0 +1,148 @@
+---
+title: "voom_rnaseq"
+author: "HN Singh"
+date: "2022-11-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## VOOM RNA SEQ ANALYSIS
+Differential Expression with Limma-Voom
+https://ucdavis-bioinformatics-training.github.io/2018-June-RNA-Seq-Workshop/thursday/DE.html
+
+
+```{load library, echo=FALSE}
+library(edgeR)
+```
+
+## Read Counts
+
+```{r read_counts, echo=FALSE}
+setwd("/Users/singhh5/Pictures/research_projects/Project_08138J")#set working directory
+count <- read.csv(file = "allSample.htseq.count.txt", header = TRUE, row.names = "ENSG", sep="\t")#read htseq counts
+colnames(count) <- gsub("_..*","",colnames(count))#reduce colname
+count <- count[,order(grepl("pre|A", colnames(count)))] #order post followed by pre samples
+
+```
+
+# PREPROCESSING
+
+```{r preprocessing, echo=FALSE}
+d0 <- DGEList(count) #create DGEList Object
+#Note: calcNormFactors doesn’t normalize the data, it just calculates normalization factors for use downstream. 
+d0 <- calcNormFactors(d0) #calculate normalization factors
+#Filter low-expressed genes
+cutoff <- 1
+drop <- which(apply(cpm(d0), 1, max) < cutoff)
+d <- d0[-drop,] 
+dim(d) # number of genes left
+snames <- colnames(count) # Sample names
+group <- c(rep("post", 16), rep("pre", 19))
+```
+# Voom transformation and calculation of variance weights
+
+What is voom doing?
+
+Counts are transformed to log2 counts per million reads (CPM), where “per million reads” is defined based on the normalization factors we calculated earlier
+A linear model is fitted to the log2 CPM for each gene, and the residuals are calculated
+A smoothed curve is fitted to the sqrt(residual standard deviation) by average expression (see red line in plot above)
+The smoothed curve is used to obtain weights for each gene and sample that are passed into limma along with the log2 CPMs.
+
+```{r voom_transferation, echo=FALSE}
+#Specify the model to be fitted. We do this before using voom since voom uses variances of the model residuals (observed - fitted)
+mm <- model.matrix(~0 + group)
+#The above specifies a model where each coefficient corresponds to a group mean
+#Voom
+y <- voom(d, mm, plot = T)
+tmp <- voom(d0, mm, plot = T)
+```
+
+# Fitting linear models in limma and Calculating Differential Expression
+
+lmFit fits a linear model using weighted least squares for each gene
+    logFC: log2 fold change of post/pre
+    AveExpr: Average expression across all samples, in log2 CPM
+    t: logFC divided by its standard error
+    P.Value: Raw p-value (based on t) from test that logFC differs from 0
+    adj.P.Val: Benjamini-Hochberg false discovery rate adjusted p-value
+    B: log-odds that gene is DE (arguably less useful than the other columns)
+
+```{r fitting_linear_model and Differential Expression, echo=FALSE}
+fit <- lmFit(y, mm)
+head(coef(fit))
+
+#Comparisons between groups (log fold-changes) are obtained as contrasts of these fitted linear models:
+#Specify which groups to compare:
+#Comparison between times 6 and 9 for cultivar I5
+
+contr <- makeContrasts(grouppost - grouppre, levels = colnames(coef(fit)))
+contr
+
+#Estimate contrast for each gene
+tmp <- contrasts.fit(fit, contr)
+
+#Empirical Bayes smoothing of standard errors (shrinks standard errors that are much larger or smaller than those from other genes towards the average standard error) (see https://www.degruyter.com/doi/10.2202/1544-6115.1027)
+
+tmp <- eBayes(tmp)
+
+#What genes are most differentially expressed?
+top.table <- topTable(tmp, sort.by = "P", n = Inf)
+head(top.table, 20)
+
+```
+
+## ENSG to Gene Symbol Mapping
+```{r, echo=FALSE}
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+annot <- AnnotationDbi::select(org.Hs.eg.db,
+                               keys = keys(org.Hs.eg.db),
+                               columns = c('ENTREZID','SYMBOL','ENSEMBL',"GENENAME"),
+                               keytype = 'ENTREZID')
+
+library(dplyr)
+top.table$ENSEMBL <- gsub("\\..*","",row.names(top.table))
+exp <- inner_join(annot, top.table, by = "ENSEMBL")
+dge <- exp[(exp$logFC <=-1 | exp$logFC>=1) & exp$P.Value < 0.05,]#filer by P.va;
+write.table(dge, file = "post_vs_post.csv", row.names = FALSE, sep = "\t", quote = F)
+```
+
+
+## GENE SET ENRICHMENT ANALYSIS
+Over-representation (or enrichment) analysis is a statistical method that determines whether genes from pre-defined sets (ex: those beloging to a specific GO term or KEGG pathway) are present more than would be expected (over-represented) in a subset of your data. In this case, the subset is your set of under or over expressed genes. 
+
+```{r gene set enrichment analysis, echo=FALSE}
+#GO over-representation analysis
+bp <- enrichGO(dge$ENTREZID, ont="BP", OrgDb = 'org.Hs.eg.db', readable = TRUE)
+#GO classification; biological processes
+ego <- groupGO(gene = dge$ENTREZID, OrgDb = "org.Hs.eg.db", ont="BP", level=3, readable = TRUE)
+#GO Gene Set Enrichment Analysis; NO GENE MAPPED
+egse <- gseGO(geneList = sort(as.integer(dge$ENTREZID), decreasing = TRUE),
+              OrgDb = org.Hs.eg.db, ont = "BP", minGSSize = 100, maxGSSize = 500,
+              #pvalueCutoff = 0.05, 
+              verbose      = FALSE)
+#KEGG pathway over-representation analysis
+ekegg <- enrichKEGG(gene = dge$ENTREZID, organism  = 'hsa', pvalueCutoff = 0.05)
+#KEGG pathway gene set enrichment analysis; NO GENE MAPPED
+gse_kegg <- gseKEGG(geneList = sort(as.integer(dge$ENTREZID), decreasing = TRUE), 
+                    organism  = 'hsa', minGSSize    = 120, pvalueCutoff = 0.01, verbose = FALSE)
+#KEGG module over-representation analysis; NOT GOOD RESULTS
+emkegg <- enrichMKEGG(gene = dge$ENTREZID, organism = 'hsa',
+                   pvalueCutoff = 1, qvalueCutoff = 1)
+
+#KEGG module gene set enrichment analysis; NO GENE MAPPED
+gse_mkegg <- gseMKEGG(geneList = sort(as.integer(dge$ENTREZID), decreasing = TRUE), 
+                      organism = 'hsa',  pvalueCutoff = 1)
+
+```
+
+#Plots
+
+```{r plots, echo=FALSE}
+#Multidimensional scaling (MDS) plot
+plotMDS(exp, col = as.numeric(group))
+```

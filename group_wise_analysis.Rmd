@@ -1,0 +1,463 @@
+##---------- libraries install ---------------------------------------------------##
+````{r, library}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("EBSeq")
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install('clusterprofiler')
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install('org.Hs.eg.db')
+
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("limma")
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("edgeR")
+````
+
+##---------- read htseq count ----------------------------------------------------##
+````{r, htseq count}
+# read file
+setwd('~/Pictures/research_projects/Project_08138J/')
+GeneMat <- read.table(file = 'allSample.htseq.count.txt', sep="\t",header = TRUE, row.names = 1)
+#short column names
+colnames(GeneMat) <- gsub(pattern = '_.*', replacement = '', colnames(GeneMat))
+#sort colnames
+GeneMat <- GeneMat[,sort(names(GeneMat))]
+
+#samples with unpaired samples
+unpaired_sample <- c('EZ.132.A', 'EZ.151.pre', 'EZ.162.pre', 'EZ.167.post', 'EZ.177.pre')
+#extract paired sample htseq count
+expcount <- GeneMat[setdiff(colnames(GeneMat), unpaired_sample)]
+#condition
+cond <- as.data.frame(cbind(sample = colnames(expcount), condition = rep(c('Post','Pre')) ) )
+rownames(cond) <- cond$sample
+cond$condition <- factor(cond$condition)
+expcount <- expcount[, rownames(cond)]
+library(DESeq2)
+#get dds
+dds <- DESeqDataSetFromMatrix(countData = expcount, colData = cond, design = ~condition)
+dds <- estimateSizeFactors(dds)
+#DESeq2 normalization counts
+y = counts(dds, normalized = TRUE)
+#y_rm_zero <- y[apply(y!=0, 1, all),]#extract rows where no column with 0
+
+#rlog tranformation
+rld <- rlog(dds)
+rld_expcount <- as.data.frame(assay(rld))
+
+rld_expcount$EZ.123.log2FC <- rld_expcount$EZ.123.B - rld_expcount$EZ.123.A
+rld_expcount$EZ.124.log2FC <- rld_expcount$EZ.124.B - rld_expcount$EZ.124.A
+rld_expcount$EZ.126.log2FC <- rld_expcount$EZ.126.B - rld_expcount$EZ.126.A
+rld_expcount$EZ.128.log2FC <- rld_expcount$EZ.128.B - rld_expcount$EZ.128.A
+rld_expcount$EZ.129.log2FC <- rld_expcount$EZ.129.B - rld_expcount$EZ.129.A
+rld_expcount$EZ.130.log2FC <- rld_expcount$EZ.130.B - rld_expcount$EZ.130.A
+rld_expcount$EZ.143.log2FC <- rld_expcount$EZ.143.B - rld_expcount$EZ.143.A
+rld_expcount$EZ.146.log2FC <- rld_expcount$EZ.146.C - rld_expcount$EZ.146.A
+rld_expcount$EZ.157.log2FC <- rld_expcount$EZ.157.post - rld_expcount$EZ.157.pre
+rld_expcount$EZ.163.log2FC <- rld_expcount$EZ.163.post - rld_expcount$EZ.163.pre
+rld_expcount$EZ.171.log2FC <- rld_expcount$EZ.171.post - rld_expcount$EZ.171.pre
+rld_expcount$EZ.174.log2FC <- rld_expcount$EZ.174.post - rld_expcount$EZ.174.pre
+rld_expcount$EZ.176.log2FC <- rld_expcount$EZ.176.post - rld_expcount$EZ.176.pre
+rld_expcount$EZ.182.log2FC <- rld_expcount$EZ.182.post - rld_expcount$EZ.182.pre
+rld_expcount$EZ.185.log2FC <- rld_expcount$EZ.185.post - rld_expcount$EZ.185.pre
+
+#vst normailzation
+vld <- vst(dds)
+vld_expcount <- as.data.frame(assay(vld))
+
+vld_expcount$EZ.123.log2FC <- vld_expcount$EZ.123.B - vld_expcount$EZ.123.A
+vld_expcount$EZ.124.log2FC <- vld_expcount$EZ.124.B - vld_expcount$EZ.124.A
+vld_expcount$EZ.126.log2FC <- vld_expcount$EZ.126.B - vld_expcount$EZ.126.A
+vld_expcount$EZ.128.log2FC <- vld_expcount$EZ.128.B - vld_expcount$EZ.128.A
+vld_expcount$EZ.129.log2FC <- vld_expcount$EZ.129.B - vld_expcount$EZ.129.A
+vld_expcount$EZ.130.log2FC <- vld_expcount$EZ.130.B - vld_expcount$EZ.130.A
+vld_expcount$EZ.143.log2FC <- vld_expcount$EZ.143.B - vld_expcount$EZ.143.A
+vld_expcount$EZ.146.log2FC <- vld_expcount$EZ.146.C - vld_expcount$EZ.146.A
+vld_expcount$EZ.157.log2FC <- vld_expcount$EZ.157.post - vld_expcount$EZ.157.pre
+vld_expcount$EZ.163.log2FC <- vld_expcount$EZ.163.post - vld_expcount$EZ.163.pre
+vld_expcount$EZ.171.log2FC <- vld_expcount$EZ.171.post - vld_expcount$EZ.171.pre
+vld_expcount$EZ.174.log2FC <- vld_expcount$EZ.174.post - vld_expcount$EZ.174.pre
+vld_expcount$EZ.176.log2FC <- vld_expcount$EZ.176.post - vld_expcount$EZ.176.pre
+vld_expcount$EZ.182.log2FC <- vld_expcount$EZ.182.post - vld_expcount$EZ.182.pre
+vld_expcount$EZ.185.log2FC <- vld_expcount$EZ.185.post - vld_expcount$EZ.185.pre
+
+#DEG
+
+dge <- function(expcount){
+  cols <- unique(sub(".[^.]+$", "", colnames(expcount)))
+  print(cols)
+}
+dge(rld_expcount)
+
+````
+
+##---------- EBSeq Expression ----------------------------------------------------##
+
+Each line describes a gene and contains 7 fields: the gene name, posterior probability of being equally expressed (PPEE), posterior probability of being differentially expressed (PPDE), posterior fold change of condition 1 over condition 2 (PostFC), real fold change of condition 1 over condition 2 (RealFC), mean count of condition 1 (C1Mean) and mean count of condition 2 (C2Mean). For fold changes, PostFC is recommended over the RealFC and you can find the definition of these two fold changes in the description of PostFC function of EBSeq vignette. Please also note that PostFC, RealFC, C1Mean and C2Mean are calculated based on normalized read counts.
+
+````{r, Oct 16 2022}
+library(EBSeq)
+
+ebseqDENoReplicates <- function(expcount, listOfsamples, listConditions){
+  EBOut = EBTest(Data = as.matrix(expcount[, listOfsamples]),
+                 Conditions = as.factor(listConditions),
+                 sizeFactors = MedianNorm(expcount[, listOfsamples]),
+                 maxround = 1, Pool = TRUE)
+  GeneFC = PostFC(EBOut)
+  expDE = GetDEResults(EBOut, FDR=0.05)
+  print(length(expDE$DEfound))
+  sampMean <- do.call(cbind, c(C1 = EBOut$C1Mean, C2 = EBOut$C2Mean))
+  print(dim(sampMean))
+  fc <- merge(as.data.frame(GeneFC$RealFC), as.data.frame(GeneFC$PostFC), by=0)# Fold Change
+  exp <- cbind(sampMean,fc,EBOut$PPMat)
+  expDE=GetDEResults(EBOut, FDR=0.05)#Differentially Expressed Genes FDR < 0.05
+  de <- exp[exp$Row.names %in% as.vector(expDE$DEfound), ]#Differentially Expressed Genes
+  print(dim(de))
+  return(list(exp = exp, de = de))
+}
+
+ez123 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.123.B','EZ.123.A'), listConditions = c('C1','C2'))
+ez124 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.124.B','EZ.124.A'), listConditions = c('C1','C2'))
+ez126 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.126.B','EZ.126.A'), listConditions = c('C1','C2'))
+ez128 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.128.B','EZ.128.A'), listConditions = c('C1','C2'))
+ez129 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.129.B','EZ.129.A'), listConditions = c('C1','C2'))
+ez130 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.130.B','EZ.130.A'), listConditions = c('C1','C2'))
+ez143 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.143.B','EZ.143.A'), listConditions = c('C1','C2'))
+ez146 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.146.C','EZ.146.A'), listConditions = c('C1','C2'))
+ez157 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.157.post','EZ.157.pre'), listConditions = c('C1','C2'))
+ez163 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.163.post','EZ.163.pre'), listConditions = c('C1','C2'))
+ez171 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.171.post','EZ.171.pre'), listConditions = c('C1','C2'))
+ez174 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.174.post','EZ.174.pre'), listConditions = c('C1','C2'))
+ez176 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.176.post','EZ.176.pre'), listConditions = c('C1','C2'))
+ez182 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.182.post','EZ.182.pre'), listConditions = c('C1','C2'))
+ez185 <- ebseqDENoReplicates(expcount = expcount, listOfsamples = c('EZ.185.post','EZ.185.pre'), listConditions = c('C1','C2'))
+
+````
+##---------- LIMMA-VOOM DIFFERENTIAL EXPRESSION ANALYSIS -------------------------##
+```{r voom-limma function, echo=FALSE}
+voom_de_analysis <- function(count, nPost, nPre){
+  d0 <- DGEList(count) #create DGEList Object
+  d0 <- calcNormFactors(d0) #calculate normalization factors
+  cutoff <- 1  #Filter low-expressed genes
+  drop <- which(apply(cpm(d0), 1, max) < cutoff)
+  d <- d0[-drop,] 
+  group <- c(rep("post", nPost), rep("pre", nPre))
+  
+  mm <- model.matrix(~0 + group)#The above specifies a model where each coefficient corresponds to a group mean
+  #Voom
+  y <- voom(d, mm, plot = T)
+  tmp <- voom(d0, mm, plot = T)
+  fit <- lmFit(y, mm)
+  contr <- makeContrasts(grouppost - grouppre, levels = colnames(coef(fit)))
+  tmp <- contrasts.fit(fit, contr)#Estimate contrast for each gene
+  tmp <- eBayes(tmp)
+  top.table <- topTable(tmp, sort.by = "P", n = Inf)
+  
+  library(clusterProfiler)
+  library(org.Hs.eg.db)
+  
+  annot <- AnnotationDbi::select(org.Hs.eg.db,
+                                 keys = keys(org.Hs.eg.db),
+                                 columns = c('ENTREZID','SYMBOL','ENSEMBL',"GENENAME"),
+                                 keytype = 'ENTREZID')
+  
+  library(dplyr)
+  top.table$ENSEMBL <- gsub("\\..*","",row.names(top.table))
+  exp <- inner_join(annot, top.table, by = "ENSEMBL")
+  return(exp)
+}
+#x <- voom_de_analysis(count=count, nPost=16, nPre=19)
+```
+##---------- EBSEQ DIFFERENTIAL EXPRESSION FROM POST/PRE FUNCTION ----------------##
+```{r, echo=FALSE}
+ebseq_de_analysis <- function(count, nPost, nPre){
+  EBOut <- EBTest(Data = as.matrix(count),
+                  Conditions = as.factor(c(rep("C2", nPost), rep("C1", nPre))),
+                  sizeFactors = MedianNorm(as.matrix(count)), maxround=5)
+  GeneFC = PostFC(EBOut)
+  expDE = GetDEResults(EBOut, FDR=0.05)
+  print(length(expDE$DEfound))
+  sampMean <- do.call(cbind, c(C1 = EBOut$C1Mean, C2 = EBOut$C2Mean))
+  print(dim(sampMean))
+  fc <- merge(as.data.frame(GeneFC$RealFC), as.data.frame(GeneFC$PostFC), by=0)# Fold Change
+  exp <- cbind(sampMean,fc,EBOut$PPMat)
+  exp$logFC <- log(GeneFC$RealFC, 2)
+  exp$Row.names <- gsub("\\..*", "", exp$Row.names)
+  library(clusterProfiler)
+  library(org.Hs.eg.db)
+  library(dplyr)
+  annot <- AnnotationDbi::select(org.Hs.eg.db, keys = keys(org.Hs.eg.db),
+                                 columns = c('ENTREZID','SYMBOL','ENSEMBL',"GENENAME"),  
+                                 keytype = 'ENTREZID')
+  
+  exp <- inner_join(annot, exp, by = c("ENSEMBL" = "Row.names"))
+  
+  expDE=GetDEResults(EBOut, FDR=0.05)#Differentially Expressed Genes FDR < 0.05
+  de <- exp[exp$Row.names %in% as.vector(expDE$DEfound), ]#Differentially Expressed Genes
+  return(list(exp = exp, de = de))
+}
+#a <- ebseq_de_analysis(count=g2g1count, nPost =  8, nPre=2)
+```
+##---------- GROUP-WISE DATA (PAIR-WISE DIFFERENTIALLY EXPRESSED GENES) ----------##
+I	EZ_146_A	EZ_174_post	(EZ_177_pre)							
+II	EZ_123_A	EZ_129_A	EZ_130_A	(EZ_132_A)	EZ_143_A	(EZ_151_pre)	EZ_157_post	EZ_163_post	EZ_171_post	EZ_176_post
+III	EZ_124_A	EZ_126_B	EZ_128_A	(EZ_162_pre)	(EZ_167_post)	EZ_182_pre	EZ_185_post			
+
+```{r extract of group-wise de value, echo=FALSE}
+
+merge_by_row_name <- function(df1, df2){# Create own merging function
+  merge(df1, df2, by = "Row.names", all.x=TRUE)
+}
+
+g1 <- Reduce(merge_by_row_name, 
+             list(ez146$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez174$exp[,c('GeneFC$RealFC', 'Row.names')]))
+colnames(g1) <- c("Row.names", "ez146", "ez174")
+#row.names(g1) <- g1$Row.names
+#g1$Row.names <- NULL
+
+g2 <- Reduce(merge_by_row_name, 
+             list(ez123$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez129$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez130$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez143$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez157$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez163$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez171$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez176$exp[,c('GeneFC$RealFC', 'Row.names')])) 
+
+colnames(g2) <- c("Row.names", "ez123", "ez129", "ez130", "ez143", "ez157", "ez163", "ez171", "ez176")
+#row.names(g2) <- g2$Row.names
+#g2$Row.names <- NULL
+
+g3 <- Reduce(merge_by_row_name, 
+             list(ez124$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez126$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez128$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez182$exp[,c('GeneFC$RealFC', 'Row.names')],
+                  ez185$exp[,c('GeneFC$RealFC', 'Row.names')]))
+             
+colnames(g3) <- c("Row.names", "ez124", "ez126", "ez128", "ez182", "ez185")
+#row.names(g3) <- g1$Row.names
+#g3$Row.names <- NULL
+
+```
+
+##---------- GROUP-WISE DE ANALYSIS (PAIR-WISE DIFFERENTIALLY EXPRESSED GENES) ---##
+
+```{r group-wise de analysis, echo=FALSE}
+###############################################################
+# -----------   GROUP 2 VS GROUP 1 ANALYSIS   ----------------#
+###############################################################
+g2g1count <- na.omit(merge(g2, g1, by="Row.names", all.x=TRUE)) 
+row.names(g2g1count) <- g2g1count$Row.names
+g2g1count$Row.names <- NULL
+# ebseq gene expression
+g2vsg1 <- ebseq_de_analysis(count=g2g1count, nPost=length(colnames(g2))-1, nPre=length(colnames(g1))-1)
+de <- g2vsg1
+entrezid <- de$exp[(de$exp$logFC <= -1 | de$exp$logFC <= -1) & de$exp$PPEE<0.05,][,'ENTREZID'] 
+g2vsg1.bp <- enrichGO(entrezid, ont="BP", OrgDb = 'org.Hs.eg.db', readable = TRUE)#GO over-representation analysis
+g2vsg1.ego <- groupGO(gene = entrezid, OrgDb = "org.Hs.eg.db", ont="BP", level=3, readable = TRUE)#GO classification; biological processes
+g2vsg1.egse <- gseGO(geneList = sort(as.integer(entrezid), decreasing = TRUE),
+                     OrgDb = org.Hs.eg.db, ont = "BP", minGSSize = 100, maxGSSize = 500, #pvalueCutoff = 0.05, 
+                     verbose = FALSE)#GO Gene Set Enrichment Analysis; NO GENE MAPPED
+
+g2vsg1.ekegg <- enrichKEGG(gene = entrezid, organism  = 'hsa', pvalueCutoff = 0.05)#KEGG pathway over-representation analysis
+g2vsg1.gse_kegg <- gseKEGG(geneList = sort(as.integer(entrezid), decreasing = TRUE), 
+                           organism  = 'hsa', minGSSize    = 120, pvalueCutoff = 0.01, verbose = FALSE)#KEGG pathway gene set enrichment analysis; NO GENE MAPPED
+g2vsg1.emkegg <- enrichMKEGG(gene = entrezid, organism = 'hsa', pvalueCutoff = 1, qvalueCutoff = 1)#KEGG module over-representation analysis; NOT GOOD RESULTS
+g2vsg1.gse_mkegg <- gseMKEGG(geneList = sort(as.integer(entrezid), decreasing = TRUE), organism = 'hsa',  pvalueCutoff = 1)#KEGG module gene set enrichment analysis; NO GENE MAPPED
+
+###############################################################
+# -----------   GROUP 3 VS GROUP 1 ANALYSIS   ----------------#
+###############################################################
+
+g3g1count <- na.omit(merge(g3, g1, by="Row.names", all.x=TRUE)) 
+row.names(g3g1count) <- g3g1count$Row.names
+g3g1count$Row.names <- NULL
+#Differetial gene expression
+g3vsg1 <- ebseq_de_analysis(count=g3g1count, nPost=length(colnames(g3))-1, nPre=length(colnames(g1))-1)
+
+de <- g3vsg1
+entrezid <- de$exp[(de$exp$logFC <= -1 | de$exp$logFC <= -1) & de$exp$PPEE<0.05,][,'ENTREZID'] 
+g3vsg1.bp <- enrichGO(entrezid, ont="BP", OrgDb = 'org.Hs.eg.db', readable = TRUE)#GO over-representation analysis
+g3vsg1.ego <- groupGO(gene = entrezid, OrgDb = "org.Hs.eg.db", ont="BP", level=3, readable = TRUE)#GO classification; biological processes
+g3vsg1.egse <- gseGO(geneList = sort(as.integer(entrezid), decreasing = TRUE),
+                     OrgDb = org.Hs.eg.db, ont = "BP", minGSSize = 100, maxGSSize = 500, #pvalueCutoff = 0.05, 
+                     verbose = FALSE)#GO Gene Set Enrichment Analysis; NO GENE MAPPED
+
+g3vsg1.ekegg <- enrichKEGG(gene = entrezid, organism  = 'hsa', pvalueCutoff = 0.05)#KEGG pathway over-representation analysis
+g3vsg1.gse_kegg <- gseKEGG(geneList = sort(as.integer(entrezid), decreasing = TRUE), 
+                           organism  = 'hsa', minGSSize    = 120, pvalueCutoff = 0.01, verbose = FALSE)#KEGG pathway gene set enrichment analysis; NO GENE MAPPED
+g3vsg1.emkegg <- enrichMKEGG(gene = entrezid, organism = 'hsa', pvalueCutoff = 1, qvalueCutoff = 1)#KEGG module over-representation analysis; NOT GOOD RESULTS
+g3vsg1.gse_mkegg <- gseMKEGG(geneList = sort(as.integer(entrezid), decreasing = TRUE), organism = 'hsa',  pvalueCutoff = 1)#KEGG module gene set enrichment analysis; NO GENE MAPPED
+
+###############################################################
+# -----------   GROUP 3 VS GROUP 2 ANALYSIS   ----------------#
+###############################################################
+
+g3g2count <- na.omit(merge(g3, g2, by="Row.names", all.x=TRUE)) 
+row.names(g3g2count) <- g3g2count$Row.names
+g3g2count$Row.names <- NULL
+
+g3vsg2 <- ebseq_de_analysis(count=g3g2count, nPost=length(colnames(g3))-1, nPre=length(colnames(g2))-1)
+
+de <- g3vsg2
+entrezid <- de$exp[(de$exp$logFC <= -1 | de$exp$logFC <= -1) & de$exp$PPEE<0.05,][,'ENTREZID'] 
+g3vsg2.bp <- enrichGO(entrezid, ont="BP", OrgDb = 'org.Hs.eg.db', readable = TRUE)#GO over-representation analysis
+g3vsg2.ego <- groupGO(gene = entrezid, OrgDb = "org.Hs.eg.db", ont="BP", level=3, readable = TRUE)#GO classification; biological processes
+g3vsg2.egse <- gseGO(geneList = sort(as.integer(entrezid), decreasing = TRUE),
+                     OrgDb = org.Hs.eg.db, ont = "BP", minGSSize = 100, maxGSSize = 500, #pvalueCutoff = 0.05, 
+                     verbose = FALSE)#GO Gene Set Enrichment Analysis; NO GENE MAPPED
+
+g3vsg2.ekegg <- enrichKEGG(gene = entrezid, organism  = 'hsa', pvalueCutoff = 0.05)#KEGG pathway over-representation analysis
+g3vsg2.gse_kegg <- gseKEGG(geneList = sort(as.integer(entrezid), decreasing = TRUE), 
+                           organism  = 'hsa', minGSSize    = 120, pvalueCutoff = 0.01, verbose = FALSE)#KEGG pathway gene set enrichment analysis; NO GENE MAPPED
+g3vsg2.emkegg <- enrichMKEGG(gene = entrezid, organism = 'hsa', pvalueCutoff = 1, qvalueCutoff = 1)#KEGG module over-representation analysis; NOT GOOD RESULTS
+g3vsg2.gse_mkegg <- gseMKEGG(geneList = sort(as.integer(entrezid), decreasing = TRUE), organism = 'hsa',  pvalueCutoff = 1)#KEGG module gene set enrichment analysis; NO GENE MAPPED
+```
+
+##---------- MUTATION WISE RNA-SEQ ANALYSIS --------------------------------------##
+M/A	EZ_126_B	EZ_128_A	EZ_157_post	EZ_174_post				
+M/D	EZ_129_B	EZ_130_A	(EZ_167_post)					
+A	(EZ_132_A)	(EZ_177_pre)						
+M	EZ_146_A	EZ_171_post						
+D	EZ_185_post							
+None	EZ_123_B	EZ_124_A	EZ_143_A	(EZ_151_pre)	(EZ_162_pre)	EZ_163_post	EZ_176_pre	EZ_182_post
+
+A | D | M vs None
+A | D vs M | None
+```{r mutation-wise de analysis, echo=FALSE}
+
+```
+
+
+
+
+##---------- GSEA ClusterProfiler ------------------------------------------------##
+
+```{r, 17 Oct 2022}
+library(clusterProfiler)
+library(org.Hs.eg.db)
+gsea_clusterProfiler <- function(ezid){
+#  original_gene_list <- ezid$de$`GeneFC$PostFC`
+  original_gene_list <- ezid
+  names(original_gene_list) <- ez123$de$Row.names
+  gene_list<-na.omit(original_gene_list)
+  gene_list = sort(gene_list, decreasing = TRUE)
+  #gene_list = sort(original_gene_list, decreasing = TRUE)
+  
+  names(gene_list) <- gsub(pattern = '\\..*', replacement = '', names(gene_list))
+  
+  gse <- gseGO(geneList=gene_list, ont ="ALL", keyType = "ENSEMBL", 
+               nPerm = 10000,  minGSSize = 3, maxGSSize = 800, 
+               pvalueCutoff = 0.05, verbose = TRUE, 
+               OrgDb = org.Hs.eg.db,  pAdjustMethod = "none")
+  
+  require(DOSE)
+  dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign)
+  return(gse@result)
+  #require(DOSE)
+  #dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign)
+  
+}
+
+gsea123 <- gsea_clusterProfiler(ezid = ez123$de$`GeneFC$PostFC`)
+gsea124 <- gsea_clusterProfiler(ezid = ez124$de$`GeneFC$PostFC`)
+gsea126 <- gsea_clusterProfiler(ezid = ez126$de$`GeneFC$PostFC`)
+gsea128 <- gsea_clusterProfiler(ezid = ez128$de$`GeneFC$PostFC`)
+gsea129 <- gsea_clusterProfiler(ezid = ez129$de$`GeneFC$PostFC`)
+gsea130 <- gsea_clusterProfiler(ezid = ez130$de$`GeneFC$PostFC`)
+gsea143 <- gsea_clusterProfiler(ezid = ez143$de$`GeneFC$PostFC`)
+gsea146 <- gsea_clusterProfiler(ezid = ez146$de$`GeneFC$PostFC`)
+gsea157 <- gsea_clusterProfiler(ezid = ez157$de$`GeneFC$PostFC`)
+gsea163 <- gsea_clusterProfiler(ezid = ez163$de$`GeneFC$PostFC`)
+gsea171 <- gsea_clusterProfiler(ezid = ez171$de$`GeneFC$PostFC`)
+gsea174 <- gsea_clusterProfiler(ezid = ez174$de$`GeneFC$PostFC`)
+gsea176 <- gsea_clusterProfiler(ezid = ez176$de$`GeneFC$PostFC`)
+gsea182 <- gsea_clusterProfiler(ezid = ez182$de$`GeneFC$PostFC`)
+gsea185 <- gsea_clusterProfiler(ezid = ez185$de$`GeneFC$PostFC`)
+
+
+require(DOSE)
+dotplot(gse123, showCategory=10, split=".sign") + facet_grid(.~.sign)
+
+
+
+out <-                    'gsea185'
+original_gene_list <-        ez185$de$`GeneFC$PostFC`
+names(original_gene_list) <- ez185$de$Row.names
+
+gene_list<-na.omit(original_gene_list)
+gene_list = sort(gene_list, decreasing = TRUE)
+#gene_list = sort(original_gene_list, decreasing = TRUE)
+
+names(gene_list) <- gsub(pattern = '\\..*', replacement = '', names(gene_list))
+
+gse <- gseGO(geneList=gene_list, ont ="ALL", keyType = "ENSEMBL", 
+             nPerm = 10000,  minGSSize = 3, maxGSSize = 800, 
+             pvalueCutoff = 0.05, verbose = TRUE, 
+             OrgDb = org.Hs.eg.db,  pAdjustMethod = "none")
+
+require(DOSE)
+dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign)
+write.csv(gse, paste0('/Volumes/lilac_data_ziv/transciptome/paired_pnet/Project_08138_J/script/',
+                      out,'.csv'))
+gse<-NULL
+out <- NULL
+```
+
+##---------- read dge ------------------------------------------------------------##
+````{r, dge}
+#vld differential gene expression
+dge_col <- grep("log2FC", colnames(vld_expcount))
+vld_dge <- vld_expcount[,dge_col]
+vld_dge_anot <- merge(vld_dge, ensg_entrezid_symbol, by="row.names")
+#log2FC>=1
+#final_vld_dge <- vld_dge[apply( (vld_dge>=1) | (vld_dge <= -1), 1, any),] 
+#final_vld_dge_anot <- merge(final_vld_dge, ensg_entrezid_symbol, by="row.names")
+
+#rld differential gene expression
+dge_col <- grep("log2FC", colnames(rld_expcount))
+rld_dge <- rld_expcount[,dge_col]
+rld_dge_anot <- merge(rld_dge, ensg_entrezid_symbol, by="row.names")
+#log2FC>=1
+#final_rld_dge <- rld_dge[apply( (rld_dge>=1) | (rld_dge <= -1), 1, any),] 
+#final_rld_dge_anot <- merge(final_rld_dge, ensg_entrezid_symbol, by="row.names")
+````
+
+##---------- read growth factor --------------------------------------------------##
+````{r, growth factor}
+library(readxl)
+cgf <- read_excel('/Volumes/lilac_data_ziv/transciptome/paired_pnet/Project_08138_J/Sino Biological_Sloan_Cytokines_GFs_06272022.xlsx', sheet = "Cytokine & GF proteins", skip = 2)[,'Molecule']
+cgf <- cgf[!grepl("&", cgf$Molecule), ]
+
+r <- read_excel('/Volumes/lilac_data_ziv/transciptome/paired_pnet/Project_08138_J/Sino Biological_Sloan_Cytokines_GFs_06272022.xlsx', sheet = "Receptor proteins", skip = 2)[,'Molecule']
+r <- r[!grepl("&", r$Molecule), ]
+
+rld_cytokine_growthFactor <- rld_dge_anot[rld_dge_anot$SYMBOL %in% unique(cgf$Molecule), ]
+rld_receptors <- rld_dge_anot[rld_dge_anot$SYMBOL %in% unique(r$Molecule), ]
+
+write.table(rld_cytokine_growthFactor, file = "/Volumes/lilac_data_ziv/transciptome/paired_pnet/Project_08138_J/rld_cytokine_growthFactor.tsv", sep="\t", row.names=FALSE)
+
+write.table(rld_receptors, file = "/Volumes/lilac_data_ziv/transciptome/paired_pnet/Project_08138_J/rld_receptors.tsv", sep="\t",  row.names=FALSE)
+  
+vld_cytokine_growthFactor <- vld_dge_anot[vld_dge_anot$SYMBOL %in% unique(cgf$Molecule), ]
+vld_receptors <- vld_dge_anot[vld_dge_anot$SYMBOL %in% unique(r$Molecule), ]
+
+write.table(vld_cytokine_growthFactor, file = "/Volumes/lilac_data_ziv/transciptome/paired_pnet/Project_08138_J/vld_cytokine_growthFactor.tsv", sep="\t", row.names=FALSE)
+
+write.table(vld_receptors, file = "/Volumes/lilac_data_ziv/transciptome/paired_pnet/Project_08138_J/vld_receptors.tsv", sep="\t", row.names=FALSE)
+
+````
+
